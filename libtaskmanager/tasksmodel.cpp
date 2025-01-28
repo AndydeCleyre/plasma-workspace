@@ -888,8 +888,24 @@ bool TasksModel::Private::lessThan(const QModelIndex &left, const QModelIndex &r
                 }
             }
 
-            if (!leftDesktop.isNull() && !rightDesktop.isNull() && (leftDesktop != rightDesktop)) {
-                return (virtualDesktopInfo->position(leftDesktop) < virtualDesktopInfo->position(rightDesktop));
+            if (!leftDesktop.isNull() && !rightDesktop.isNull()) {
+                if (leftDesktop != rightDesktop) {
+                    return (virtualDesktopInfo->position(leftDesktop) < virtualDesktopInfo->position(rightDesktop));
+                } else {
+                    // Both tasks are on the same desktop, compare spatial positions
+                    const QRect leftGeom = left.data(AbstractTasksModel::Geometry).value<QRect>();
+                    const QRect rightGeom = right.data(AbstractTasksModel::Geometry).value<QRect>();
+
+                    if (leftGeom.x() != rightGeom.x()) {
+                        return leftGeom.x() < rightGeom.x();
+                    }
+
+                    if (leftGeom.y() != rightGeom.y()) {
+                        return leftGeom.y() < rightGeom.y();
+                    }
+
+                    // Fall through if x and y coordinates are identical
+                }
             } else if (!leftDesktop.isNull() && rightDesktop.isNull()) {
                 return false;
             } else if (leftDesktop.isNull() && !rightDesktop.isNull()) {
