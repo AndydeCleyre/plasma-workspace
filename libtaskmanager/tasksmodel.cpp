@@ -26,6 +26,7 @@
 #include <QUrl>
 
 #include <numeric>
+#include <optional>
 
 namespace TaskManager
 {
@@ -80,6 +81,7 @@ public:
     void updateActivityTaskCounts();
     void forceResort();
     bool lessThan(const QModelIndex &left, const QModelIndex &right, bool sortOnlyLaunchers = false) const;
+    std::optional<bool> lessThanByVirtualDesktop(const QModelIndex &left, const QModelIndex &right) const;
 
 private:
     TasksModel *const q;
@@ -767,6 +769,51 @@ void TasksModel::Private::forceResort()
     q->setDynamicSortFilter(true);
 }
 
+std::optional<bool> TasksModel::Private::lessThanByVirtualDesktop(const QModelIndex &left, const QModelIndex &right) const
+{
+    const bool leftAll = left.data(AbstractTasksModel::IsOnAllVirtualDesktops).toBool();
+    const bool rightAll = right.data(AbstractTasksModel::IsOnAllVirtualDesktops).toBool();
+
+    if (leftAll && !rightAll) {
+        return true;
+    }
+
+    if (!leftAll && rightAll) {
+        return false;
+    }
+
+    if (!leftAll && !rightAll) {
+        const auto getDesktop = [this](const QModelIndex &model) {
+            const QVariantList modelDesktops = model.data(AbstractTasksModel::VirtualDesktops).toList();
+            QVariant modelDesktop;
+            int modelDesktopPos = virtualDesktopInfo->numberOfDesktops();
+            for (const QVariant &desktop : modelDesktops) {
+                const int desktopPos = virtualDesktopInfo->position(desktop);
+
+                if (desktopPos <= modelDesktopPos) {
+                    modelDesktop = desktop;
+                    modelDesktopPos = desktopPos;
+                }
+            }
+            return modelDesktop;
+        };
+
+        const QVariant leftDesktop = getDesktop(left);
+        const QVariant rightDesktop = getDesktop(right);
+
+        if (!leftDesktop.isNull() && !rightDesktop.isNull() && (leftDesktop != rightDesktop)) {
+            return (virtualDesktopInfo->position(leftDesktop) < virtualDesktopInfo->position(rightDesktop));
+        } else if (!leftDesktop.isNull() && rightDesktop.isNull()) {
+            return false;
+        } else if (leftDesktop.isNull() && !rightDesktop.isNull()) {
+            return true;
+        }
+    }
+
+    // We couldn't determine the order (e.g., both on all desktops or the same desktop)
+    return std::nullopt;
+}
+
 bool TasksModel::Private::lessThan(const QModelIndex &left, const QModelIndex &right, bool sortOnlyLaunchers) const
 {
     // Launcher tasks go first.
@@ -850,44 +897,12 @@ bool TasksModel::Private::lessThan(const QModelIndex &left, const QModelIndex &r
     }
     // fall through
     case SortVirtualDesktop: {
-        const bool leftAll = left.data(AbstractTasksModel::IsOnAllVirtualDesktops).toBool();
-        const bool rightAll = right.data(AbstractTasksModel::IsOnAllVirtualDesktops).toBool();
 
-        if (leftAll && !rightAll) {
-            return true;
+        if (auto result = lessThanByVirtualDesktop(left, right)) {
+            return *result;
         }
 
-        if (!leftAll && rightAll) {
-            return false;
-        }
-
-        if (!leftAll && !rightAll) {
-            const auto getDesktop = [this](const QModelIndex &model) {
-                const QVariantList modelDesktops = model.data(AbstractTasksModel::VirtualDesktops).toList();
-                QVariant modelDesktop;
-                int modelDesktopPos = virtualDesktopInfo->numberOfDesktops();
-                for (const QVariant &desktop : modelDesktops) {
-                    const int desktopPos = virtualDesktopInfo->position(desktop);
-
-                    if (desktopPos <= modelDesktopPos) {
-                        modelDesktop = desktop;
-                        modelDesktopPos = desktopPos;
-                    }
-                }
-                return modelDesktop;
-            };
-
-            const QVariant leftDesktop = getDesktop(left);
-            const QVariant rightDesktop = getDesktop(right);
-
-            if (!leftDesktop.isNull() && !rightDesktop.isNull() && (leftDesktop != rightDesktop)) {
-                return (virtualDesktopInfo->position(leftDesktop) < virtualDesktopInfo->position(rightDesktop));
-            } else if (!leftDesktop.isNull() && rightDesktop.isNull()) {
-                return false;
-            } else if (leftDesktop.isNull() && !rightDesktop.isNull()) {
-                return true;
-            }
-        }
+        Q_FALLTHROUGH();
     }
     // fall through
     case SortActivity: {
