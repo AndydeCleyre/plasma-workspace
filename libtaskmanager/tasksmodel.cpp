@@ -874,6 +874,29 @@ bool TasksModel::Private::lessThan(const QModelIndex &left, const QModelIndex &r
         return (left.row() < right.row());
     }
 
+    case SortWindowPosition: {
+
+        if (auto result = lessThanByVirtualDesktop(left, right)) {
+            return *result;
+        }
+
+        const QRect leftGeom = left.data(AbstractTasksModel::Geometry).value<QRect>();
+        const QRect rightGeom = right.data(AbstractTasksModel::Geometry).value<QRect>();
+
+        if (leftGeom.x() != rightGeom.x()) {
+            if (QGuiApplication::isRightToLeft()) {
+                return leftGeom.right() > rightGeom.right();
+            } else {
+                return leftGeom.x() < rightGeom.x();
+            }
+        }
+        if (leftGeom.y() != rightGeom.y()) {
+            return leftGeom.y() < rightGeom.y();
+        }
+
+        Q_FALLTHROUGH();
+    }
+
     case SortLastActivated: {
         const auto getSortDateTime = [](const QModelIndex &model) {
             // Check if the task is in a group
@@ -1219,10 +1242,10 @@ void TasksModel::setSortMode(SortMode mode)
             d->sortedPreFilterRows.clear();
         }
 
-        if (mode == SortVirtualDesktop) {
+        if (mode == SortVirtualDesktop || mode == SortWindowPosition) {
             d->virtualDesktopInfo = virtualDesktopInfo();
             setSortRole(AbstractTasksModel::VirtualDesktops);
-        } else if (d->sortMode == SortVirtualDesktop) {
+        } else if (d->sortMode == SortVirtualDesktop || d->sortMode == SortWindowPosition) {
             d->virtualDesktopInfo = nullptr;
             setSortRole(Qt::DisplayRole);
         }

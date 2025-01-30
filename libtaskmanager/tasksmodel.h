@@ -92,6 +92,7 @@ public:
         SortManual, /**< Tasks can be moved with move() and syncLaunchers(). */
         SortAlpha, /**< Tasks are sorted alphabetically, by AbstractTasksModel::AppName and Qt::DisplayRole. */
         SortVirtualDesktop, /**< Tasks are sorted by the virtual desktop they are on. */
+        SortWindowPosition, /**< Tasks are sorted by the virtual desktop they are on, then by window coordinates. */
         SortActivity, /**< Tasks are sorted by the number of tasks on the activities they're on. */
         SortLastActivated, /**< Tasks are sorted by the last time they were active. */
     };
